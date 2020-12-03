@@ -16,7 +16,7 @@ import time
 import re
 
 # Configuration for request
-DELAY = 1
+DELAY = 0
 URL = "https://dictionary.cambridge.org/vi/dictionary/english/"
 HEADER = {
     "Referer": "https://dictionary.cambridge.org/",
@@ -41,6 +41,30 @@ def read_file(filename):
     return lines
 
 
+def fix_tense(word, origin, transcription):
+    if origin == word:
+        return transcription
+
+    if word[len(word) - 2:] == "ed" or word[len(word) - 1:] == "d":
+        if transcription[len(transcription) - 1:] in ["s", "p", "k", "f", "ʃ", "tʃ"]:
+            transcription = transcription + "t"
+        elif transcription[len(transcription) - 2:] in ["t", "d"]:
+            transcription = transcription + "id"
+        else:
+            transcription = transcription + "d"
+    if word[len(word) - 2:] == "es" or word[len(word) - 1:] == "s":
+        if transcription[len(transcription) - 1:] in ["p", "k", "t", "f", "θ"]:
+            transcription = transcription + "s"
+        elif transcription[len(transcription) - 2:] in ["tʃ", "s", "ʃ", "z", "ʒ", "dʒ"]:
+            transcription = transcription + "iz"
+        else:
+            transcription = transcription + "z"
+
+    # print(word, origin, transcription)
+
+    return transcription
+
+
 """
 Extract word by word from each line by based on whitespace, then make transcription.
 return: list of transcription.
@@ -54,14 +78,28 @@ def make_transcription(lines):
         list_of_words = line.split(" ")
         transcription_line = ""
         for word in list_of_words:
+
+            # remove sepecial character in string like : " , etc.
+            w = ""
+            for c in word:
+                if c.isalnum():
+                    w += c
+
+            word = w
+
             r = requests.get(url=URL + word, headers=HEADER)
-            transcription = extract_transcription(r)
+            origin, transcription = extract_transcription(r)
 
             # In case not found transcription, keep original word
             if transcription:
+                transcription = fix_tense(word=word, origin=origin,
+                                          transcription=transcription)  # Fixing case having s, es, d or ed
                 transcription_line = transcription_line + transcription + " "
             else:
                 transcription_line = transcription_line + word + " "
+
+            print(origin)
+            print(transcription)
 
             time.sleep(DELAY)  # Bypass rate limit
 
@@ -76,12 +114,16 @@ return: string
 
 
 def extract_transcription(response):
-    pattern = "/<span class=\"ipa dipa lpr-2 lpl-1\">(\S+)</span>/"
+    pattern = "/<span class=\"ipa dipa lpr-2 lpl-1\">(\S+)</span>/"  # This pattern is used for transcription
+    ori_pattern = "<span class=\"hw dhw\">(\S+)</span></span>"  # This pattern is used for matched word
+
     matched = re.search(pattern=pattern, string=response.text)
+    ori_matched = re.search(pattern=ori_pattern, string=response.text)
+
     if matched:
-        return (matched.group(1))
+        return ori_matched.group(1), matched.group(1)
     else:
-        return None
+        return None, None
 
 
 """
