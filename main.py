@@ -132,7 +132,7 @@ Write to file the result
 
 
 def write_to_file(lines, trans_lines, filename):
-    with open(filename, "w") as f:
+    with open(filename, "w", encoding="utf-8") as f:
         for line in lines:
             f.write(line)
             f.write("\n")  # Break line each line
